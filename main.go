@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,7 +30,24 @@ type Citizen struct {
 
 var collection *mongo.Collection
 
+// func corsMiddleware(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		// Allow requests from any origin
+// 		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+// 		// Allow certain headers
+// 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+// 		// Allow certain methods
+// 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+
+// 		// Continue handling the request
+// 		next.ServeHTTP(w, r)
+// 	})
+// }
+
 func main() {
+
 	// Set up MongoDB client
 	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017/")
 
@@ -40,8 +58,14 @@ func main() {
 	defer client.Disconnect(context.Background())
 
 	collection = client.Database("citizensDB").Collection("citizens")
-
+	corsOptions := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"}, // Allow all origins
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type"},
+		AllowCredentials: true,
+	})
 	router := mux.NewRouter()
+
 	router.HandleFunc("/citizens", GetCitizens).Methods("GET")
 	router.HandleFunc("/citizens", AddCitizen).Methods("POST")
 	router.HandleFunc("/citizens/{id}", GetCitizen).Methods("GET")
@@ -49,8 +73,9 @@ func main() {
 	router.HandleFunc("/citizens/{id}", DeleteCitizen).Methods("DELETE")
 
 	// Start the server
+	handler := corsOptions.Handler(router)
 	log.Println("Server started on port 8000")
-	log.Fatal(http.ListenAndServe(":8000", router))
+	log.Fatal(http.ListenAndServe(":8000", handler))
 }
 
 // GetCitizens returns a list of all citizens
